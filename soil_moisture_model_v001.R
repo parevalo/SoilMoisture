@@ -10,31 +10,46 @@ predict.JAGS <- function(time,y,p) {
 
   SoilMoisturePrecipFusion = "
   model{
+
+  ### Loop over all individuals
+  for(i in 1:ni){  
   
   #### Data Model
-  for(i in 1:n){
-  y[i] ~ dnorm(x[i],tau_obs)
+  for(t in 1:nt){
+  y[i, t] ~ dnorm(x[i, t],tau_obs)
   }
   
   #### Process Model
-  for(i in 2:n){
-  SoilMoisture[i] <- beta_0*x[i-1] + beta_1*p[i]
-  x[i]~dnorm(SoilMoisture[i],tau_add)
+  for(t in 2:nt){
+  SoilMoisture[i, t] <- beta_0*x[i-1, t-1] + beta_1*p[i, t] + ind[i] + year[t]
+  x[i, t]~dnorm(SoilMoisture[i, t],tau_add)
   }
+
+  ## individual effects
+  ind[i] ~ dnorm(0,tau_ind)
   
+  ## initial condition
+  x[i, 1] ~ dunif(x_ic_lower,x_ic_upper) #This doesn't make sense, maybe there's no need to iterate over individuals?
+  }  ## end loop over individuals
   
+  ## year effects
+  for(t in 1:nt){
+  year[t] ~ dnorm(0,tau_yr)
+  }
   
   #### Priors
   tau_obs ~ dgamma(a_obs,r_obs)
   tau_add ~ dgamma(a_add,r_add)
   beta_0 ~ dbeta(a_beta0,r_beta0)
   beta_1 ~ dgamma(a_beta1,r_beta1)
-  ## initial condition
-  x[1] ~ dunif(x_ic_lower,x_ic_upper)  
+
+  tau_ind ~ dgamma(1,0.1)
+  tau_yr  ~ dgamma(1,0.1)
+
 }
 "
   
-  data <- list(y=log(y),p=p, n=length(y),x_ic_lower=log(0.000001),x_ic_upper=log(1), a_obs=0.01,
+  data <- list(y=log(y),p=p, ni=length(y),x_ic_lower=log(0.000001),x_ic_upper=log(1), a_obs=0.01,
                r_obs=0.01,a_add=0.01, r_add=1, a_beta0=1,r_beta0=0.5, a_beta1=1, r_beta1=0.001)
 
 
