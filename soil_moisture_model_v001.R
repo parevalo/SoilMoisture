@@ -12,16 +12,20 @@ predict.JAGS <- function(time,y,p) {
   model{
   
   #### Data Model
-  for(i in 1:n){
-  y[i] ~ dnorm(x[i],tau_obs)
+  for(t in 1:nt){
+  y[t] ~ dnorm(x[t],tau_obs)
   }
   
   #### Process Model
-  for(i in 2:n){
-  SoilMoisture[i] <- beta_0*x[i-1] + beta_1*p[i]
-  x[i]~dnorm(SoilMoisture[i],tau_add)
+  for(t in 2:nt){
+  SoilMoisture[t] <- beta_0*x[t-1] + beta_1*p[t] #+ ind[t]
+  x[t]~dnorm(SoilMoisture[t],tau_add)
   }
   
+  ## Daily effects?
+  for(t in 1:nt){
+    ind[t] ~ dnorm(0,tau_ind)  
+  }
   
   
   #### Priors
@@ -29,12 +33,14 @@ predict.JAGS <- function(time,y,p) {
   tau_add ~ dgamma(a_add,r_add)
   beta_0 ~ dbeta(a_beta0,r_beta0)
   beta_1 ~ dgamma(a_beta1,r_beta1)
+  tau_ind ~ dgamma(1,0.1)
+
   ## initial condition
   x[1] ~ dunif(x_ic_lower,x_ic_upper)  
 }
 "
   
-  data <- list(y=log(y),p=p, n=length(y),x_ic_lower=log(0.000001),x_ic_upper=log(1), a_obs=0.01,
+  data <- list(y=log(y),p=p, nt=length(y),x_ic_lower=log(0.000001),x_ic_upper=log(1), a_obs=0.01,
                r_obs=0.01,a_add=0.01, r_add=1, a_beta0=1,r_beta0=0.5, a_beta1=1, r_beta1=0.001)
 
 
@@ -43,7 +49,7 @@ predict.JAGS <- function(time,y,p) {
   init <- list()
   for(i in 1:nchain){
     y.samp = sample(y,length(y),replace=TRUE)
-    init[[i]] <- list(tau_add=1/var(diff((log(y.samp)))),tau_obs=1/var((log(y.samp))))
+    init[[i]] <- list(tau_add=1/var(diff((log(y.samp)))),tau_obs=1/var((log(y.samp))), ind=rep(0,length(t)), tau_ind=0.01)
   }
   
   j.model   <- jags.model (file = textConnection(SoilMoisturePrecipFusion),
@@ -77,7 +83,8 @@ ciEnvelope <- function(x,ylo,yhi,...){
 
 #-------------load data and merge datasets
 ## set working directory 
-data.root.path = '/home/carya/SoilMoisture/example'
+#data.root.path = '/home/carya/SoilMoisture/example'
+data.root.path = 'C:/OneDrive/Spring_2016/GE585/SoilMoisture/example/'
 # Soil Moisture (cm^3 of water per cm^3 of soil)
 SMAP <- read.csv(sprintf("%sSMAP.csv",data.root.path))    ## read in soil moisture data 
 GPM <- read.csv(sprintf("%sGPM.csv",data.root.path))      ## read in precipitation data 
